@@ -239,4 +239,182 @@ function ds_movies_with_genre_buttons_shortcode($atts) {
     return $output;
 }
 add_shortcode('movies_genre_buttons', 'ds_movies_with_genre_buttons_shortcode');
+
+function add_movie_rating_meta_box() {
+    add_meta_box(
+        'movie_rating',
+        'Movie Rating',
+        'movie_rating_callback',
+        'movies'
+    );
+}
+add_action('add_meta_boxes', 'add_movie_rating_meta_box');
+
+function movie_rating_callback($post) {
+    $value = get_post_meta($post->ID, 'rating', true);
+    echo '<input type="number" step="0.1" min="0" max="10" name="rating" value="'.esc_attr($value).'" />';
+}
+
+function save_movie_rating($post_id) {
+    if(isset($_POST['rating'])) {
+        update_post_meta($post_id, 'rating', sanitize_text_field($_POST['rating']));
+    }
+}
+add_action('save_post', 'save_movie_rating');
+function ds_insert_sample_movies() {
+
+    // Kontrollo nëse jemi në admin dhe nuk janë futur më parë
+    if ( !is_admin() ) return;
+
+    $movies = array(
+        array(
+            'title' => 'Inception',
+            'content' => 'A thief who steals corporate secrets through the use of dream-sharing technology.',
+            'genres' => array('sci-fi','thriller'),
+            'rating' => 8.8,
+            'tags' => array('dream','heist')
+        ),
+        array(
+            'title' => 'The Dark Knight',
+            'content' => 'Batman faces the Joker in Gotham City.',
+            'genres' => array('action','drama'),
+            'rating' => 9.0,
+            'tags' => array('batman','joker')
+        ),
+        array(
+            'title' => 'Interstellar',
+            'content' => 'A team of explorers travel through a wormhole in space.',
+            'genres' => array('sci-fi','adventure'),
+            'rating' => 8.6,
+            'tags' => array('space','time')
+        ),
+        array(
+            'title' => 'The Matrix',
+            'content' => 'A hacker discovers reality is a simulated world.',
+            'genres' => array('sci-fi','action'),
+            'rating' => 8.7,
+            'tags' => array('simulation','hacker')
+        ),
+        array(
+            'title' => 'Avengers: Endgame',
+            'content' => 'The Avengers assemble to undo Thanos\' actions.',
+            'genres' => array('action','adventure'),
+            'rating' => 8.4,
+            'tags' => array('marvel','superheroes')
+        ),
+        array(
+            'title' => 'Gladiator',
+            'content' => 'A former Roman General seeks revenge against the emperor.',
+            'genres' => array('action','drama'),
+            'rating' => 8.5,
+            'tags' => array('rome','revenge')
+        ),
+        array(
+            'title' => 'Titanic',
+            'content' => 'A love story unfolds aboard the doomed RMS Titanic.',
+            'genres' => array('romance','drama'),
+            'rating' => 7.8,
+            'tags' => array('ship','love')
+        ),
+        array(
+            'title' => 'Jurassic Park',
+            'content' => 'Dinosaurs are brought back to life in a theme park.',
+            'genres' => array('adventure','sci-fi'),
+            'rating' => 8.1,
+            'tags' => array('dinosaurs','park')
+        ),
+        array(
+            'title' => 'The Lord of the Rings: The Fellowship of the Ring',
+            'content' => 'A hobbit embarks on a quest to destroy a powerful ring.',
+            'genres' => array('fantasy','adventure'),
+            'rating' => 8.8,
+            'tags' => array('ring','middle-earth')
+        ),
+        array(
+            'title' => 'Star Wars: Episode IV – A New Hope',
+            'content' => 'Luke Skywalker begins his journey to become a Jedi.',
+            'genres' => array('sci-fi','adventure'),
+            'rating' => 8.6,
+            'tags' => array('star wars','jedi')
+        ),
+    );
+
+    foreach($movies as $movie){
+
+        // Kontrollo nëse filmi ekziston tashmë (prevent duplicates)
+        $existing = get_page_by_title($movie['title'], OBJECT, 'movies');
+        if($existing) continue;
+
+        $post_id = wp_insert_post(array(
+            'post_title' => $movie['title'],
+            'post_content' => $movie['content'],
+            'post_status' => 'publish',
+            'post_type' => 'movies',
+        ));
+
+        if($post_id){
+            // Set rating meta
+            update_post_meta($post_id, 'rating', $movie['rating']);
+
+            // Set genres
+            wp_set_object_terms($post_id, $movie['genres'], 'movie_genres');
+
+            // Set tags
+            wp_set_post_tags($post_id, $movie['tags']);
+        }
+    }
+}
+// Vetëm admin: do funksionojë kur hysh në admin
+add_action('admin_init', 'ds_insert_sample_movies');
+// Shortcode: show all movies on one page
+function ds_show_all_movies_shortcode() {
+
+    $args = array(
+        'post_type'      => 'movies',
+        'posts_per_page' => -1, // shfaq të gjithë
+        'orderby'        => 'date',
+        'order'          => 'DESC'
+    );
+
+    $query = new WP_Query($args);
+
+    $output = '<div class="row g-4">';
+
+    if($query->have_posts()){
+        while($query->have_posts()){
+            $query->the_post();
+
+            $genres = get_the_term_list(get_the_ID(), 'movie_genres', '', ', ', '');
+            $tags = get_the_term_list(get_the_ID(), 'post_tag', '', ', ', '');
+
+            $output .= '<div class="col-md-4">';
+            $output .= '<div class="card movie-card h-100 shadow-sm">';
+            
+            if(has_post_thumbnail()){
+                $output .= get_the_post_thumbnail(get_the_ID(), 'medium', array('class'=>'card-img-top img-fluid'));
+            }
+
+            $output .= '<div class="card-body">';
+            $output .= '<h5 class="card-title">'.get_the_title().'</h5>';
+            $output .= '<p class="card-text">'.get_the_excerpt().'</p>';
+            if($genres) $output .= '<p><strong>Genres:</strong> '.$genres.'</p>';
+            if($tags) $output .= '<p><strong>Tags:</strong> '.$tags.'</p>';
+            $output .= '</div>';
+
+            $rating = get_post_meta(get_the_ID(), 'rating', true);
+            if($rating) $output .= '<div class="card-footer text-muted">⭐ '.$rating.'/10</div>';
+
+            $output .= '</div>'; // close card
+            $output .= '</div>'; // close col
+        }
+        wp_reset_postdata();
+    } else {
+        $output .= '<p>No movies found.</p>';
+    }
+
+    $output .= '</div>'; // close row
+
+    return $output;
+}
+add_shortcode('all_movies', 'ds_show_all_movies_shortcode');
 ?>

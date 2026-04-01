@@ -1,100 +1,130 @@
-/*
-Theme Name: DS Theme
-Theme URI: https://digitalschool.eu/prishtine/
-Author: Digital School
-Author URI: https://digitalschool.eu/prishtine/
-Description: A basic custom theme for learning purposes
-Version: 1.0
-License: GNU General Public License
-License URI: https://digitalschool.eu/prishtine/
-Text Domain: ds-theme
-Tags: education, basic-theme, grupi6A
-*/
-
+/* Përmirësimet e përgjithshme */
 body {
-    font-family: Arial, sans-serif;
+    background-color: #0f0f0f;
+    color: #ffffff;
+    font-family: 'Poppins', sans-serif;
     margin: 0;
-    padding: 0;
+    overflow-x: hidden;
 }
 
-header {
-    background: #111;
-    color: white;
-    padding: 20px;
-    text-align: center;
-}
-
-main {
-    padding: 40px;
-}
-
-footer {
-    background: #f4f4f4;
-    padding: 20px;
-    text-align: center;
-}
-
-/* Container */
-.single-container {
+/* HERO MOVIE SECTION */
+.movie-hero {
+    position: relative;
+    height: 90vh;
     display: flex;
-    max-width: 1200px;
-    margin: 50px auto;
-    gap: 40px;
+    align-items: center;
+    padding: 0 5%; /* Shton hapësirë anësore */
 }
 
-/* Main content */
-.single-main {
-    flex: 3;
+.movie-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Sigurohet që imazhi të qëndrojë prapa */
 }
 
-/* Sidebar */
-.single-sidebar {
-    flex: 1;
+.movie-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-/* Post styling */
-.single-post {
-    background: #f9f9f9;
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 40px;
+.movie-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Gradient më i butë që errëson edhe fundin për blending më të mirë */
+    background: linear-gradient(90deg, rgba(15,15,15,1) 20%, rgba(15,15,15,0.4) 50%, transparent 100%),
+                linear-gradient(0deg, rgba(15,15,15,1) 0%, transparent 30%);
 }
 
-.post-title {
-    color: #2c3e50;
-    font-size: 2.2em;
+.movie-content {
+    position: relative;
+    z-index: 2;
+    max-width: 700px;
+}
+
+.movie-content h1 {
+    font-size: clamp(2.5rem, 5vw, 4rem); /* Madhësi adaptive për mobile */
+    font-weight: 800;
     margin-bottom: 10px;
+    line-height: 1.1;
 }
 
-.post-meta {
-    color: #7f8c8d;
-    font-size: 0.9em;
+.movie-meta {
     margin-bottom: 20px;
 }
 
-.post-image img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
-    margin-bottom: 20px;
+.movie-meta span {
+    margin-right: 15px;
+    color: #bbb;
+    font-size: 0.9rem;
 }
 
-.post-categories, .post-tags {
-    font-size: 0.95em;
-    margin-bottom: 15px;
+/* MOVIE CARDS */
+.movie-card {
+    background: #1c1c1c;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    cursor: pointer;
 }
 
-.post-content {
-    font-size: 1.1em;
-    line-height: 1.8;
-    color: #34495e;
+.movie-card:hover {
+    transform: scale(1.05);
+    z-index: 5;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.5);
 }
 
-.post-edit {
-    margin-top: 20px;
+.movie-card img {
+    width: 100%;
+    height: 350px;
+    object-fit: cover;
+    display: block;
 }
 
-.comments-section {
-    margin-top: 50px;
+/* HOVER OVERLAY - E përmirësuar */
+.movie-card::after {
+    content: "▶ Luaj";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.2rem;
+    opacity: 0;
+    transition: 0.3s ease;
+}
+
+.movie-card:hover::after {
+    opacity: 1;
+}
+
+/* FILTER BUTTONS */
+.filter-btn {
+    border: none;
+    background: #2a2a2a;
+    color: white;
+    border-radius: 50px;
+    padding: 10px 25px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.filter-btn:hover, .filter-btn.active {
+    background: #e50914; /* Ngjyra tipike e Netflix */
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(229, 9, 20, 0.3);
 }

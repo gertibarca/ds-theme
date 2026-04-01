@@ -1,25 +1,31 @@
 <?php get_header(); ?>
 
-<div class="container my-5">
-    <?php if(have_posts()) : while(have_posts()) : the_post(); ?>
-        <article class="card p-4 mb-4 shadow-sm">
-            <h1 class="card-title"><?php the_title(); ?></h1>
-            
-            <?php if(has_post_thumbnail()) : ?>
-                <div class="mb-3">
-                    <?php the_post_thumbnail('large', array('class'=>'img-fluid rounded')); ?>
-                </div>
-            <?php endif; ?>
+<div class="movie-hero">
+    <?php if(has_post_thumbnail()): ?>
+        <div class="movie-bg">
+            <?php the_post_thumbnail('full'); ?>
+        </div>
+    <?php endif; ?>
 
-            <div class="card-text">
-                <?php the_content(); ?>
-            </div>
+    <div class="movie-overlay"></div>
 
-            <p class="text-muted mt-3">
-                Posted on <?php echo get_the_date(); ?>
-            </p>
-        </article>
-    <?php endwhile; endif; ?>
+    <div class="movie-content container">
+        <h1><?php the_title(); ?></h1>
+
+        <div class="movie-meta">
+            <span><?php echo get_the_date(); ?></span>
+            <span>⭐ <?php echo get_post_meta(get_the_ID(), 'rating', true); ?>/10</span>
+        </div>
+
+        <div class="movie-description">
+            <?php the_content(); ?>
+        </div>
+
+        <div class="movie-actions">
+            <a href="#" class="btn btn-danger">▶ Watch Trailer</a>
+            <a href="#" class="btn btn-outline-light">+ Add to List</a>
+        </div>
+    </div>
 </div>
 
 <?php get_footer(); ?>
