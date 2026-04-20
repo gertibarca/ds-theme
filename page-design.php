@@ -196,5 +196,10 @@ get_header();
         <?php endif; ?>
     </div>
 </div>
+<a href="#" class="btn btn-outline-light add-to-list"
+   data-id="<?php echo get_the_ID(); ?>"
+   data-title="<?php the_title(); ?>">
+   + Add to List
+</a>
 
 <?php get_footer(); ?>

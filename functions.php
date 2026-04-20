@@ -417,4 +417,88 @@ function ds_show_all_movies_shortcode() {
     return $output;
 }
 add_shortcode('all_movies', 'ds_show_all_movies_shortcode');
+// Override Movies archive layout (show all together)
+function ds_custom_movies_archive($template) {
+    if (is_post_type_archive('movies')) {
+        add_action('the_content', 'ds_replace_archive_content');
+    }
+    return $template;
+}
+add_filter('template_include', 'ds_custom_movies_archive');
+
+function ds_replace_archive_content($content) {
+
+    if (!is_post_type_archive('movies')) return $content;
+
+    $query = new WP_Query(array(
+        'post_type' => 'movies',
+        'posts_per_page' => -1
+    ));
+
+    ob_start();
+
+    echo '<div class="container"><div class="row g-4">';
+
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+
+            echo '<div class="col-md-4">';
+            echo '<div class="card movie-card h-100">';
+
+            if (has_post_thumbnail()) {
+                the_post_thumbnail('medium', ['class'=>'card-img-top']);
+            }
+
+            echo '<div class="card-body">';
+            echo '<h5>'. get_the_title() .'</h5>';
+            echo '<p>'. get_the_excerpt() .'</p>';
+
+            $rating = get_post_meta(get_the_ID(), 'rating', true);
+            if ($rating) {
+                echo '<p>⭐ '.$rating.'/10</p>';
+            }
+
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+        wp_reset_postdata();
+    } else {
+        echo '<p>No movies found.</p>';
+    }
+
+    echo '</div></div>';
+
+    return ob_get_clean();
+}
+// Make Movies show on homepage
+function ds_homepage_show_movies($query) {
+    if (!is_admin() && $query->is_main_query() && is_home()) {
+        $query->set('post_type', 'movies');
+        $query->set('posts_per_page', -1);
+    }
+}
+add_action('pre_get_posts', 'ds_homepage_show_movies');
+function add_movie_trailer_meta_box() {
+    add_meta_box(
+        'movie_trailer',
+        'Movie Trailer (YouTube URL)',
+        'movie_trailer_callback',
+        'movies'
+    );
+}
+add_action('add_meta_boxes', 'add_movie_trailer_meta_box');
+
+function movie_trailer_callback($post) {
+    $value = get_post_meta($post->ID, 'trailer_url', true);
+    echo '<input type="text" style="width:100%" name="trailer_url" value="'.esc_attr($value).'" placeholder="https://youtube.com/...">';
+}
+
+function save_movie_trailer($post_id) {
+    if(isset($_POST['trailer_url'])) {
+        update_post_meta($post_id, 'trailer_url', esc_url($_POST['trailer_url']));
+    }
+}
+add_action('save_post', 'save_movie_trailer');
 ?>

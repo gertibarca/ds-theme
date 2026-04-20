@@ -27,5 +27,9 @@
         </div>
     </div>
 </div>
+<a href="#" class="btn btn-danger watch-trailer" 
+   data-trailer="<?php echo get_post_meta(get_the_ID(), 'trailer_url', true); ?>">
+   ▶ Watch Trailer
+</a>
 
 <?php get_footer(); ?>
