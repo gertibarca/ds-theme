@@ -3,46 +3,28 @@
 function dstheme_setup() { 
     add_theme_support( 'post-thumbnails' ); 
     add_theme_support( 'post-formats', array( 'aside', 'image', 'video' ) ); 
-    add_theme_support( 'title-tag' ); 
+    add_theme_support( 'title-tag' );
+    
+    // Add custom image sizes
+    add_image_size( 'movie-poster', 220, 330, true );
+    add_image_size( 'movie-hero', 1920, 1080, true );
+    add_image_size( 'movie-card', 400, 600, true );
 } 
 add_action( 'after_setup_theme', 'dstheme_setup' ); 
 
 // 2. Load Styles and Scripts
 function dstheme_assets() { 
-    wp_enqueue_style( 'bootstrap-css',
-        'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
-        array(),
-        '5.3.3',
-        'all'
-    ); 
+    wp_enqueue_style( 'bootstrap-css', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css', array(), '5.3.3', 'all' ); 
 
-    wp_enqueue_style( 'ds-style',
-        get_stylesheet_uri(),
-        array('bootstrap-css'),
-        '1.0',
-        'all'
-    ); 
+    wp_enqueue_style( 'ds-style', get_stylesheet_uri(), array('bootstrap-css'), '1.0', 'all' ); 
 
-    wp_enqueue_style( 'slider-style',
-        get_template_directory_uri() . '/css/slider.css',
-        array('bootstrap-css'),
-        '1.0',
-        'all'
-    ); 
+    wp_enqueue_style( 'slider-style', get_template_directory_uri() . '/css/slider.css', array('bootstrap-css'), '1.0', 'all' ); 
 
-    wp_enqueue_script( 'bootstrap-js',
-        'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
-        array(),
-        '5.3.3',
-        true
-    );
+    wp_enqueue_script( 'bootstrap-js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js', array(), '5.3.3', true );
 
-    wp_enqueue_script( 'customjs',
-        get_template_directory_uri() . '/js/custom.js',
-        array( 'jquery', 'bootstrap-js' ),
-        '1.0',
-        true
-    ); 
+    wp_enqueue_script( 'customjs', get_template_directory_uri() . '/js/custom.js', array( 'jquery', 'bootstrap-js' ), '1.0', true );
+
+    wp_enqueue_script( 'advancedjs', get_template_directory_uri() . '/js/advanced.js', array( 'jquery' ), '1.0', true );
 
     if ( is_singular() && comments_open() && get_option( 'thread_comments' ) ) { 
         wp_enqueue_script( 'comment-reply' ); 
@@ -94,7 +76,6 @@ add_action( 'widgets_init', 'register_foo_widget' );
 
 // 5. Register Custom Post Type: Movies with Tags
 function ds_register_movies_cpt() {
-
     $labels = array(
         'name'                  => _x( 'Movies', 'Post Type General Name', 'ds-theme' ),
         'singular_name'         => _x( 'Movie', 'Post Type Singular Name', 'ds-theme' ),
@@ -176,13 +157,11 @@ function ds_movies_with_genre_buttons_shortcode($atts) {
         'posts_per_page' => -1,
     ), $atts, 'movies_genre_buttons');
 
-    // Get all genres
     $genres = get_terms(array(
-        'taxonomy' => 'movie_genres',
+        'taxonomy'   => 'movie_genres',
         'hide_empty' => true,
     ));
 
-    // Buttons
     $output = '<div class="movie-filters mb-4">';
     $output .= '<button class="btn btn-primary me-2 filter-btn" data-genre="all">All</button>';
     if(!empty($genres) && !is_wp_error($genres)) {
@@ -192,7 +171,6 @@ function ds_movies_with_genre_buttons_shortcode($atts) {
     }
     $output .= '</div>';
 
-    // Movies container
     $query = new WP_Query(array(
         'post_type' => 'movies',
         'posts_per_page' => $atts['posts_per_page'],
@@ -221,7 +199,6 @@ function ds_movies_with_genre_buttons_shortcode($atts) {
     }
     $output .= '</div>';
 
-    // JS for button filter
     $output .= '<script>
     jQuery(document).ready(function($){
         $(".filter-btn").click(function(){
@@ -240,265 +217,140 @@ function ds_movies_with_genre_buttons_shortcode($atts) {
 }
 add_shortcode('movies_genre_buttons', 'ds_movies_with_genre_buttons_shortcode');
 
-function add_movie_rating_meta_box() {
+// 8. Force display all movies without pagination
+function ds_movies_archive_query( $query ) {
+    if ( !is_admin() && $query->is_main_query() && is_post_type_archive( 'movies' ) ) {
+        $query->set( 'posts_per_page', -1 );
+        $query->set( 'paged', 1 );
+    }
+    return $query;
+}
+add_action( 'pre_get_posts', 'ds_movies_archive_query' );
+
+// 9. Add Movie YouTube URL & Rating Metabox
+function ds_add_movie_metabox() {
     add_meta_box(
-        'movie_rating',
-        'Movie Rating',
-        'movie_rating_callback',
-        'movies'
+        'movie_details',
+        'Movie Details',
+        'ds_movie_metabox_callback',
+        'movies',
+        'normal',
+        'high'
     );
 }
-add_action('add_meta_boxes', 'add_movie_rating_meta_box');
+add_action( 'add_meta_boxes', 'ds_add_movie_metabox' );
 
-function movie_rating_callback($post) {
-    $value = get_post_meta($post->ID, 'rating', true);
-    echo '<input type="number" step="0.1" min="0" max="10" name="rating" value="'.esc_attr($value).'" />';
+function ds_movie_metabox_callback( $post ) {
+    wp_nonce_field( 'ds_movie_metabox_nonce', 'ds_movie_nonce' );
+    
+    $youtube_url = get_post_meta( $post->ID, '_movie_youtube_url', true );
+    $rating = get_post_meta( $post->ID, '_movie_rating', true );
+    $duration = get_post_meta( $post->ID, '_movie_duration', true );
+    $year = get_post_meta( $post->ID, '_movie_year', true );
+    $trailer_video = get_post_meta( $post->ID, '_movie_trailer_video', true );
+    $imdb_rating = get_post_meta( $post->ID, '_movie_imdb_rating', true );
+    $badge = get_post_meta( $post->ID, '_movie_badge', true );
+    ?>
+    <div style="padding: 20px 0;">
+        <div style="margin-bottom: 20px;">
+            <label for="movie_youtube_url" style="display: block; margin-bottom: 8px; font-weight: 600;">YouTube Video URL:</label>
+            <input type="url" id="movie_youtube_url" name="movie_youtube_url" value="<?php echo esc_attr( $youtube_url ); ?>" 
+                   placeholder="https://www.youtube.com/watch?v=..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <small style="color: #666; display: block; margin-top: 5px;">Full YouTube URL for main video</small>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="movie_trailer_video" style="display: block; margin-bottom: 8px; font-weight: 600;">Trailer Video URL (MP4):</label>
+            <input type="url" id="movie_trailer_video" name="movie_trailer_video" value="<?php echo esc_attr( $trailer_video ); ?>" 
+                   placeholder="https://example.com/trailer.mp4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <small style="color: #666; display: block; margin-top: 5px;">Video file URL for hover effect (MP4 recommended)</small>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="movie_imdb_rating" style="display: block; margin-bottom: 8px; font-weight: 600;">IMDb Rating (0-10):</label>
+            <input type="number" id="movie_imdb_rating" name="movie_imdb_rating" value="<?php echo esc_attr( $imdb_rating ); ?>" 
+                   min="0" max="10" step="0.1" placeholder="8.5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="movie_badge" style="display: block; margin-bottom: 8px; font-weight: 600;">Badge Text (e.g., "Trending", "4K Ultra HD"):</label>
+            <input type="text" id="movie_badge" name="movie_badge" value="<?php echo esc_attr( $badge ); ?>" 
+                   placeholder="Trending" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <small style="color: #666; display: block; margin-top: 5px;">Leave empty for no badge</small>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="movie_rating" style="display: block; margin-bottom: 8px; font-weight: 600;">Rating (0-10):</label>
+            <input type="number" id="movie_rating" name="movie_rating" value="<?php echo esc_attr( $rating ); ?>" 
+                   min="0" max="10" step="0.1" placeholder="8.5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="movie_duration" style="display: block; margin-bottom: 8px; font-weight: 600;">Duration (minutes):</label>
+            <input type="number" id="movie_duration" name="movie_duration" value="<?php echo esc_attr( $duration ); ?>" 
+                   placeholder="120" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="movie_year" style="display: block; margin-bottom: 8px; font-weight: 600;">Release Year:</label>
+            <input type="number" id="movie_year" name="movie_year" value="<?php echo esc_attr( $year ); ?>" 
+                   placeholder="2024" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+    </div>
+    <?php
 }
 
-function save_movie_rating($post_id) {
-    if(isset($_POST['rating'])) {
-        update_post_meta($post_id, 'rating', sanitize_text_field($_POST['rating']));
-    }
-}
-add_action('save_post', 'save_movie_rating');
-function ds_insert_sample_movies() {
-
-    // Kontrollo nëse jemi në admin dhe nuk janë futur më parë
-    if ( !is_admin() ) return;
-
-    $movies = array(
-        array(
-            'title' => 'Inception',
-            'content' => 'A thief who steals corporate secrets through the use of dream-sharing technology.',
-            'genres' => array('sci-fi','thriller'),
-            'rating' => 8.8,
-            'tags' => array('dream','heist')
-        ),
-        array(
-            'title' => 'The Dark Knight',
-            'content' => 'Batman faces the Joker in Gotham City.',
-            'genres' => array('action','drama'),
-            'rating' => 9.0,
-            'tags' => array('batman','joker')
-        ),
-        array(
-            'title' => 'Interstellar',
-            'content' => 'A team of explorers travel through a wormhole in space.',
-            'genres' => array('sci-fi','adventure'),
-            'rating' => 8.6,
-            'tags' => array('space','time')
-        ),
-        array(
-            'title' => 'The Matrix',
-            'content' => 'A hacker discovers reality is a simulated world.',
-            'genres' => array('sci-fi','action'),
-            'rating' => 8.7,
-            'tags' => array('simulation','hacker')
-        ),
-        array(
-            'title' => 'Avengers: Endgame',
-            'content' => 'The Avengers assemble to undo Thanos\' actions.',
-            'genres' => array('action','adventure'),
-            'rating' => 8.4,
-            'tags' => array('marvel','superheroes')
-        ),
-        array(
-            'title' => 'Gladiator',
-            'content' => 'A former Roman General seeks revenge against the emperor.',
-            'genres' => array('action','drama'),
-            'rating' => 8.5,
-            'tags' => array('rome','revenge')
-        ),
-        array(
-            'title' => 'Titanic',
-            'content' => 'A love story unfolds aboard the doomed RMS Titanic.',
-            'genres' => array('romance','drama'),
-            'rating' => 7.8,
-            'tags' => array('ship','love')
-        ),
-        array(
-            'title' => 'Jurassic Park',
-            'content' => 'Dinosaurs are brought back to life in a theme park.',
-            'genres' => array('adventure','sci-fi'),
-            'rating' => 8.1,
-            'tags' => array('dinosaurs','park')
-        ),
-        array(
-            'title' => 'The Lord of the Rings: The Fellowship of the Ring',
-            'content' => 'A hobbit embarks on a quest to destroy a powerful ring.',
-            'genres' => array('fantasy','adventure'),
-            'rating' => 8.8,
-            'tags' => array('ring','middle-earth')
-        ),
-        array(
-            'title' => 'Star Wars: Episode IV – A New Hope',
-            'content' => 'Luke Skywalker begins his journey to become a Jedi.',
-            'genres' => array('sci-fi','adventure'),
-            'rating' => 8.6,
-            'tags' => array('star wars','jedi')
-        ),
-    );
-
-    foreach($movies as $movie){
-
-        // Kontrollo nëse filmi ekziston tashmë (prevent duplicates)
-        $existing = get_page_by_title($movie['title'], OBJECT, 'movies');
-        if($existing) continue;
-
-        $post_id = wp_insert_post(array(
-            'post_title' => $movie['title'],
-            'post_content' => $movie['content'],
-            'post_status' => 'publish',
-            'post_type' => 'movies',
-        ));
-
-        if($post_id){
-            // Set rating meta
-            update_post_meta($post_id, 'rating', $movie['rating']);
-
-            // Set genres
-            wp_set_object_terms($post_id, $movie['genres'], 'movie_genres');
-
-            // Set tags
-            wp_set_post_tags($post_id, $movie['tags']);
-        }
-    }
-}
-// Vetëm admin: do funksionojë kur hysh në admin
-add_action('admin_init', 'ds_insert_sample_movies');
-// Shortcode: show all movies on one page
-function ds_show_all_movies_shortcode() {
-
-    $args = array(
-        'post_type'      => 'movies',
-        'posts_per_page' => -1, // shfaq të gjithë
-        'orderby'        => 'date',
-        'order'          => 'DESC'
-    );
-
-    $query = new WP_Query($args);
-
-    $output = '<div class="row g-4">';
-
-    if($query->have_posts()){
-        while($query->have_posts()){
-            $query->the_post();
-
-            $genres = get_the_term_list(get_the_ID(), 'movie_genres', '', ', ', '');
-            $tags = get_the_term_list(get_the_ID(), 'post_tag', '', ', ', '');
-
-            $output .= '<div class="col-md-4">';
-            $output .= '<div class="card movie-card h-100 shadow-sm">';
-            
-            if(has_post_thumbnail()){
-                $output .= get_the_post_thumbnail(get_the_ID(), 'medium', array('class'=>'card-img-top img-fluid'));
-            }
-
-            $output .= '<div class="card-body">';
-            $output .= '<h5 class="card-title">'.get_the_title().'</h5>';
-            $output .= '<p class="card-text">'.get_the_excerpt().'</p>';
-            if($genres) $output .= '<p><strong>Genres:</strong> '.$genres.'</p>';
-            if($tags) $output .= '<p><strong>Tags:</strong> '.$tags.'</p>';
-            $output .= '</div>';
-
-            $rating = get_post_meta(get_the_ID(), 'rating', true);
-            if($rating) $output .= '<div class="card-footer text-muted">⭐ '.$rating.'/10</div>';
-
-            $output .= '</div>'; // close card
-            $output .= '</div>'; // close col
-        }
-        wp_reset_postdata();
-    } else {
-        $output .= '<p>No movies found.</p>';
+function ds_save_movie_metabox( $post_id ) {
+    if ( ! isset( $_POST['ds_movie_nonce'] ) || ! wp_verify_nonce( $_POST['ds_movie_nonce'], 'ds_movie_metabox_nonce' ) ) {
+        return;
     }
 
-    $output .= '</div>'; // close row
-
-    return $output;
-}
-add_shortcode('all_movies', 'ds_show_all_movies_shortcode');
-// Override Movies archive layout (show all together)
-function ds_custom_movies_archive($template) {
-    if (is_post_type_archive('movies')) {
-        add_action('the_content', 'ds_replace_archive_content');
-    }
-    return $template;
-}
-add_filter('template_include', 'ds_custom_movies_archive');
-
-function ds_replace_archive_content($content) {
-
-    if (!is_post_type_archive('movies')) return $content;
-
-    $query = new WP_Query(array(
-        'post_type' => 'movies',
-        'posts_per_page' => -1
-    ));
-
-    ob_start();
-
-    echo '<div class="container"><div class="row g-4">';
-
-    if ($query->have_posts()) {
-        while ($query->have_posts()) {
-            $query->the_post();
-
-            echo '<div class="col-md-4">';
-            echo '<div class="card movie-card h-100">';
-
-            if (has_post_thumbnail()) {
-                the_post_thumbnail('medium', ['class'=>'card-img-top']);
-            }
-
-            echo '<div class="card-body">';
-            echo '<h5>'. get_the_title() .'</h5>';
-            echo '<p>'. get_the_excerpt() .'</p>';
-
-            $rating = get_post_meta(get_the_ID(), 'rating', true);
-            if ($rating) {
-                echo '<p>⭐ '.$rating.'/10</p>';
-            }
-
-            echo '</div>';
-            echo '</div>';
-            echo '</div>';
-        }
-        wp_reset_postdata();
-    } else {
-        echo '<p>No movies found.</p>';
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
     }
 
-    echo '</div></div>';
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
+        return;
+    }
 
-    return ob_get_clean();
-}
-// Make Movies show on homepage
-function ds_homepage_show_movies($query) {
-    if (!is_admin() && $query->is_main_query() && is_home()) {
-        $query->set('post_type', 'movies');
-        $query->set('posts_per_page', -1);
+    if ( isset( $_POST['movie_youtube_url'] ) ) {
+        update_post_meta( $post_id, '_movie_youtube_url', esc_url( $_POST['movie_youtube_url'] ) );
+    }
+
+    if ( isset( $_POST['movie_rating'] ) ) {
+        update_post_meta( $post_id, '_movie_rating', sanitize_text_field( $_POST['movie_rating'] ) );
+    }
+
+    if ( isset( $_POST['movie_duration'] ) ) {
+        update_post_meta( $post_id, '_movie_duration', sanitize_text_field( $_POST['movie_duration'] ) );
+    }
+
+    if ( isset( $_POST['movie_year'] ) ) {
+        update_post_meta( $post_id, '_movie_year', sanitize_text_field( $_POST['movie_year'] ) );
+    }
+
+    if ( isset( $_POST['movie_trailer_video'] ) ) {
+        update_post_meta( $post_id, '_movie_trailer_video', esc_url( $_POST['movie_trailer_video'] ) );
+    }
+
+    if ( isset( $_POST['movie_imdb_rating'] ) ) {
+        update_post_meta( $post_id, '_movie_imdb_rating', sanitize_text_field( $_POST['movie_imdb_rating'] ) );
+    }
+
+    if ( isset( $_POST['movie_badge'] ) ) {
+        update_post_meta( $post_id, '_movie_badge', sanitize_text_field( $_POST['movie_badge'] ) );
     }
 }
-add_action('pre_get_posts', 'ds_homepage_show_movies');
-function add_movie_trailer_meta_box() {
-    add_meta_box(
-        'movie_trailer',
-        'Movie Trailer (YouTube URL)',
-        'movie_trailer_callback',
-        'movies'
-    );
-}
-add_action('add_meta_boxes', 'add_movie_trailer_meta_box');
+add_action( 'save_post', 'ds_save_movie_metabox' );
 
-function movie_trailer_callback($post) {
-    $value = get_post_meta($post->ID, 'trailer_url', true);
-    echo '<input type="text" style="width:100%" name="trailer_url" value="'.esc_attr($value).'" placeholder="https://youtube.com/...">';
-}
-
-function save_movie_trailer($post_id) {
-    if(isset($_POST['trailer_url'])) {
-        update_post_meta($post_id, 'trailer_url', esc_url($_POST['trailer_url']));
+// 10. Get YouTube embed URL
+function ds_get_youtube_embed_url( $url ) {
+    if ( empty( $url ) ) return false;
+    
+    $pattern = '/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/';
+    if ( preg_match( $pattern, $url, $matches ) ) {
+        return 'https://www.youtube.com/embed/' . $matches[1];
     }
+    return false;
 }
-add_action('save_post', 'save_movie_trailer');
 ?>

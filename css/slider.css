@@ -2,7 +2,7 @@
     position: relative;
     width: 100%;
     max-width: 1000px;
-    margin: 40px auto; 
+    margin: 40px auto;
     overflow: hidden;
     border-radius: 10px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.2);
@@ -33,38 +33,13 @@
     background-color: rgba(0,0,0,0.8);
 }
 
-.slider .prev {
-    left: 20px;
-}
+.slider .prev { left: 20px; }
+.slider .next { right: 20px; }
 
-.slider .next {
-    right: 20px;
-}
-
-.slider-dots {
-    text-align: center;
-    margin-top: 15px;
-}
-
-.slider-dots span {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    margin: 0 5px;
-    background-color: #bbb;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.slider-dots .active {
-    background-color: #111;
-}
+.slider-dots { text-align: center; margin-top: 15px; }
+.slider-dots span { display: inline-block; width: 12px; height: 12px; margin: 0 5px; background-color: #bbb; border-radius: 50%; cursor: pointer; transition: background-color 0.3s; }
+.slider-dots .active { background-color: #111; }
 
 @media (max-width: 768px) {
-    .slider .prev,
-    .slider .next {
-        padding: 8px 12px;
-        font-size: 16px;
-    }
+    .slider .prev, .slider .next { padding: 8px 12px; font-size: 16px; }
 }
