@@ -1,4 +1,12 @@
-<?php get_header(); ?>
+<?php 
+// If this is a movies archive, load the proper archive template
+if (is_post_type_archive('movies')) {
+    locate_template('archive-movies.php', true);
+    exit;
+}
+
+get_header(); 
+?>
 
 <?php 
 // Get featured movie (latest)

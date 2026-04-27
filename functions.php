@@ -18,7 +18,10 @@ function dstheme_assets() {
 
     wp_enqueue_style( 'ds-style', get_stylesheet_uri(), array('bootstrap-css'), '1.0', 'all' ); 
 
-    wp_enqueue_style( 'slider-style', get_template_directory_uri() . '/css/slider.css', array('bootstrap-css'), '1.0', 'all' ); 
+    wp_enqueue_style( 'slider-style', get_template_directory_uri() . '/css/slider.css', array('bootstrap-css'), '1.0', 'all' );
+    
+    // Load movies CSS with cache buster
+    wp_enqueue_style( 'movies-page-style', get_template_directory_uri() . '/css/movies-page.css', array('bootstrap-css'), time(), 'all' );
 
     wp_enqueue_script( 'bootstrap-js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js', array(), '5.3.3', true );
 
@@ -120,6 +123,14 @@ function ds_register_movies_cpt() {
     register_taxonomy_for_object_type( 'post_tag', 'movies' );
 }
 add_action( 'init', 'ds_register_movies_cpt' );
+
+// Flush rewrite rules when theme is activated
+function ds_theme_activation() {
+    ds_register_movies_cpt();
+    register_taxonomy_movie_genres();
+    flush_rewrite_rules();
+}
+add_action('after_switch_theme', 'ds_theme_activation');
 
 // 6. Register Custom Taxonomy: Movie Genres
 function register_taxonomy_movie_genres() {
@@ -353,4 +364,371 @@ function ds_get_youtube_embed_url( $url ) {
     }
     return false;
 }
+
+// 11. REST API Endpoint: Load More Movies (Infinite Scroll)
+function ds_api_load_more_movies( $request ) {
+    $page = $request->get_param('page') ? intval($request->get_param('page')) : 1;
+    $genre = $request->get_param('genre') ? sanitize_text_field($request->get_param('genre')) : '';
+    
+    $args = array(
+        'post_type'      => 'movies',
+        'posts_per_page' => 12,
+        'paged'          => $page,
+        'post_status'    => 'publish',
+    );
+    
+    if (!empty($genre) && $genre !== 'all') {
+        $args['tax_query'] = array(
+            array(
+                'taxonomy' => 'movie_genres',
+                'field'    => 'slug',
+                'terms'    => $genre,
+            )
+        );
+    }
+    
+    $movies_query = new WP_Query($args);
+    $movies = array();
+    
+    if ($movies_query->have_posts()) {
+        while ($movies_query->have_posts()) {
+            $movies_query->the_post();
+            $movie_id = get_the_ID();
+            
+            $movies[] = array(
+                'id'             => $movie_id,
+                'title'          => get_the_title(),
+                'permalink'      => get_permalink(),
+                'thumbnail'      => get_the_post_thumbnail_url($movie_id, 'movie-card'),
+                'excerpt'        => wp_trim_words(get_the_excerpt(), 15, '...'),
+                'imdb_rating'    => get_post_meta($movie_id, '_movie_imdb_rating', true),
+                'trailer_video'  => get_post_meta($movie_id, '_movie_trailer_video', true),
+                'badge'          => get_post_meta($movie_id, '_movie_badge', true),
+            );
+        }
+        wp_reset_postdata();
+    }
+    
+    return new WP_REST_Response(array(
+        'success' => true,
+        'movies'  => $movies,
+        'max_pages' => $movies_query->max_num_pages,
+        'total_movies' => $movies_query->found_posts,
+    ), 200);
+}
+
+// 12. REST API Endpoint: Live Search
+function ds_api_live_search( $request ) {
+    $search_query = $request->get_param('q');
+    
+    if (empty($search_query) || strlen($search_query) < 2) {
+        return new WP_REST_Response(array(
+            'success' => false,
+            'results' => array(),
+        ), 200);
+    }
+    
+    $search_query = sanitize_text_field($search_query);
+    
+    $args = array(
+        'post_type'      => 'movies',
+        'posts_per_page' => 10,
+        's'              => $search_query,
+        'post_status'    => 'publish',
+    );
+    
+    $search_query_obj = new WP_Query($args);
+    $results = array();
+    
+    if ($search_query_obj->have_posts()) {
+        while ($search_query_obj->have_posts()) {
+            $search_query_obj->the_post();
+            $movie_id = get_the_ID();
+            
+            $results[] = array(
+                'id'       => $movie_id,
+                'title'    => get_the_title(),
+                'permalink' => get_permalink(),
+                'thumbnail' => get_the_post_thumbnail_url($movie_id, 'thumbnail'),
+                'excerpt'  => wp_trim_words(get_the_excerpt(), 10, '...'),
+            );
+        }
+        wp_reset_postdata();
+    }
+    
+    return new WP_REST_Response(array(
+        'success' => true,
+        'results' => $results,
+    ), 200);
+}
+
+// Register REST API routes
+add_action('rest_api_init', function() {
+    register_rest_route('ds-theme/v1', '/load-more', array(
+        'methods'             => 'GET',
+        'callback'            => 'ds_api_load_more_movies',
+        'permission_callback' => '__return_true',
+    ));
+    
+    register_rest_route('ds-theme/v1', '/search', array(
+        'methods'             => 'GET',
+        'callback'            => 'ds_api_live_search',
+        'permission_callback' => '__return_true',
+    ));
+});
+
+// ====== SAMPLE DATA GENERATOR ======
+
+/**
+ * Generate sample movies with images
+ * Usage: Call ds_create_sample_movies() from admin
+ */
+function ds_create_sample_movies() {
+    $sample_movies = array(
+        array(
+            'title' => 'Inception',
+            'excerpt' => 'A skilled thief navigates dreams to plant ideas. A mind-bending sci-fi masterpiece.',
+            'genres' => array('Sci-Fi', 'Thriller', 'Action'),
+            'rating' => 8.8,
+            'badge' => 'Masterpiece',
+            'image_url' => 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'The Shawshank Redemption',
+            'excerpt' => 'Two imprisoned men bond over a long period, finding redemption through acts of common decency.',
+            'genres' => array('Drama', 'Crime'),
+            'rating' => 9.3,
+            'badge' => 'Classic',
+            'image_url' => 'https://images.unsplash.com/photo-1533613220915-121e16073d3b?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'The Dark Knight',
+            'excerpt' => 'Batman faces a clown-masked criminal mastermind in an explosive battle for Gotham.',
+            'genres' => array('Action', 'Crime', 'Drama'),
+            'rating' => 9.0,
+            'badge' => 'Trending',
+            'image_url' => 'https://images.unsplash.com/photo-1516876437184-593fda40c7ce?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Pulp Fiction',
+            'excerpt' => 'Multiple interconnected stories of crime, violence, and redemption in Los Angeles.',
+            'genres' => array('Crime', 'Drama'),
+            'rating' => 8.9,
+            'badge' => 'Cult Classic',
+            'image_url' => 'https://images.unsplash.com/photo-1547873799-f1d6808e8a11?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Interstellar',
+            'excerpt' => 'A team of explorers travel through a wormhole in space to save humanity.',
+            'genres' => array('Sci-Fi', 'Drama', 'Adventure'),
+            'rating' => 8.6,
+            'badge' => 'Epic',
+            'image_url' => 'https://images.unsplash.com/photo-1516846573888-558881c922e0?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'The Matrix',
+            'excerpt' => 'A computer programmer discovers the reality he knows is a simulation.',
+            'genres' => array('Sci-Fi', 'Action'),
+            'rating' => 8.7,
+            'badge' => 'Iconic',
+            'image_url' => 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Forrest Gump',
+            'excerpt' => 'A simple man becomes an inadvertent influencer and witness to defining historical events.',
+            'genres' => array('Drama', 'Romance'),
+            'rating' => 8.8,
+            'badge' => 'Feel-Good',
+            'image_url' => 'https://images.unsplash.com/photo-1483706543466-f82db2ac9d4b?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Gladiator',
+            'excerpt' => 'A former Roman General seeks revenge against the emperor who murdered his family.',
+            'genres' => array('Action', 'Drama', 'History'),
+            'rating' => 8.5,
+            'badge' => 'Award Winner',
+            'image_url' => 'https://images.unsplash.com/photo-1534695905606-82fa17e5aaae?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'The Prestige',
+            'excerpt' => 'Two stage magicians engage in a battle to create the ultimate illusion.',
+            'genres' => array('Mystery', 'Thriller', 'Drama'),
+            'rating' => 8.5,
+            'badge' => 'Clever Plot',
+            'image_url' => 'https://images.unsplash.com/photo-1516846573888-558881c922e0?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Parasite',
+            'excerpt' => 'A poor family schemes to become employed by a wealthy household.',
+            'genres' => array('Drama', 'Thriller'),
+            'rating' => 8.6,
+            'badge' => 'Palme d\'Or',
+            'image_url' => 'https://images.unsplash.com/photo-1513741550867-28d24a3bb6cb?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Dune',
+            'excerpt' => 'A young man must prevent a terrible future only he can foresee on a hostile desert planet.',
+            'genres' => array('Sci-Fi', 'Adventure', 'Action'),
+            'rating' => 8.0,
+            'badge' => '4K Ultra HD',
+            'image_url' => 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&h=600&fit=crop',
+        ),
+        array(
+            'title' => 'Oppenheimer',
+            'excerpt' => 'The story of American scientist J. Robert Oppenheimer and the creation of the atomic bomb.',
+            'genres' => array('Biography', 'Drama', 'History'),
+            'rating' => 8.4,
+            'badge' => '2024 Best',
+            'image_url' => 'https://images.unsplash.com/photo-1569191318165-e33ffc3b4caf?w=400&h=600&fit=crop',
+        ),
+    );
+    
+    foreach ($sample_movies as $movie) {
+        // Check if movie already exists
+        $existing = get_posts(array(
+            'post_type' => 'movies',
+            'title' => $movie['title'],
+        ));
+        
+        if (!empty($existing)) {
+            continue;
+        }
+        
+        // Create the movie post
+        $post_id = wp_insert_post(array(
+            'post_title' => $movie['title'],
+            'post_content' => $movie['excerpt'],
+            'post_excerpt' => $movie['excerpt'],
+            'post_type' => 'movies',
+            'post_status' => 'publish',
+        ));
+        
+        if (!is_wp_error($post_id)) {
+            // Download and set featured image
+            ds_set_movie_thumbnail_from_url($post_id, $movie['image_url']);
+            
+            // Set custom fields
+            update_post_meta($post_id, '_movie_imdb_rating', $movie['rating']);
+            update_post_meta($post_id, '_movie_badge', $movie['badge']);
+            
+            // Set genres
+            if (!empty($movie['genres'])) {
+                $genre_ids = array();
+                foreach ($movie['genres'] as $genre_name) {
+                    $term = get_term_by('name', $genre_name, 'movie_genres');
+                    if (!$term) {
+                        $term = wp_insert_term($genre_name, 'movie_genres');
+                    }
+                    if (!is_wp_error($term)) {
+                        $genre_ids[] = is_array($term) ? $term['term_id'] : $term->term_id;
+                    }
+                }
+                wp_set_post_terms($post_id, $genre_ids, 'movie_genres');
+            }
+        }
+    }
+}
+
+/**
+ * Download image and set as featured image
+ */
+function ds_set_movie_thumbnail_from_url($post_id, $image_url) {
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+    
+    // Download the image
+    $tmp = download_url($image_url);
+    
+    if (!is_wp_error($tmp)) {
+        // Prepare an array of post data for the attachment.
+        $file_array = array(
+            'name' => basename($image_url),
+            'tmp_name' => $tmp
+        );
+        
+        // Do the validation and storage stuff.
+        $id = media_handle_sideload($file_array, $post_id);
+        
+        // If successful, set as featured image
+        if (!is_wp_error($id)) {
+            set_post_thumbnail($post_id, $id);
+        } else {
+            @unlink($tmp);
+        }
+    }
+}
+
+// Add admin notice with sample data generator
+add_action('admin_notices', function() {
+    if (!get_option('ds_movies_sample_created')) {
+        ?>
+        <div class="notice notice-info is-dismissible">
+            <p><strong>DS Theme Movies:</strong> No movies found. 
+                <a href="<?php echo esc_url(add_query_arg('ds_create_sample_movies', '1')); ?>" class="button button-primary">
+                    Create Sample Movies
+                </a>
+            </p>
+        </div>
+        <?php
+    }
+});
+
+// Handle sample data creation
+add_action('admin_init', function() {
+    if (isset($_GET['ds_create_sample_movies']) && current_user_can('manage_options')) {
+        ds_create_sample_movies();
+        update_option('ds_movies_sample_created', true);
+        wp_redirect(admin_url('edit.php?post_type=movies'));
+        exit;
+    }
+});
+
+?>
+    register_rest_route('ds-theme/v1', '/search', array(
+        'methods'             => 'GET',
+        'callback'            => 'ds_api_live_search',
+        'permission_callback' => '__return_true',
+    ));
+});
+
+// 13. Register custom fields in REST API
+function ds_register_rest_fields() {
+    register_rest_field('movies', 'imdb_rating', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post->ID, '_movie_imdb_rating', true);
+        },
+        'schema' => array(
+            'type' => 'string',
+        ),
+    ));
+    
+    register_rest_field('movies', 'trailer_video', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post->ID, '_movie_trailer_video', true);
+        },
+        'schema' => array(
+            'type' => 'string',
+        ),
+    ));
+    
+    register_rest_field('movies', 'badge_text', array(
+        'get_callback' => function($post) {
+            return get_post_meta($post->ID, '_movie_badge', true);
+        },
+        'schema' => array(
+            'type' => 'string',
+        ),
+    ));
+}
+add_action('rest_api_init', 'ds_register_rest_fields');
+
+// 14. Enqueue movie page scripts
+function ds_enqueue_movie_scripts() {
+    // Load on Movies archive page AND Movies page template
+    if (is_post_type_archive('movies') || is_page_template('page-movies.php')) {
+        wp_enqueue_script('movies-page', get_template_directory_uri() . '/js/movies-page.js', array('jquery'), time(), true);
+    }
+}
+add_action('wp_enqueue_scripts', 'ds_enqueue_movie_scripts');
 ?>
