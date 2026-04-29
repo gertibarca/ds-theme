@@ -1,27 +1,29 @@
 /**
  * DS Theme - Movies Page Functionality
- * Handles search, filtering, and bookmarks
+ * OPTIMIZED: Lazy loading, debouncing, RAF optimization
  */
+
+// Performance tracking
+const perfMetrics = {
+    renderTime: 0,
+    imageLoadCount: 0,
+    videoLoadCount: 0
+};
 
 jQuery(document).ready(function($) {
     console.log('Movies page initialized');
     
-    // Search functionality
+    // Initialize lazy loading for images
+    initLazyLoadImages();
+    
+    // Debounced search functionality
+    let searchTimeout;
     $('#movieSearch').on('keyup', function() {
-        const searchTerm = $(this).val().toLowerCase();
-        
-        $('.movie-card').each(function() {
-            const title = $(this).find('.movie-title').text().toLowerCase();
-            const excerpt = $(this).find('.movie-excerpt').text().toLowerCase();
-            const genres = $(this).find('.genre-tag').text().toLowerCase();
-            
-            const matches = title.includes(searchTerm) || 
-                           excerpt.includes(searchTerm) || 
-                           genres.includes(searchTerm) ||
-                           searchTerm === '';
-            
-            $(this).toggle(matches);
-        });
+        clearTimeout(searchTimeout);
+        const $input = $(this);
+        searchTimeout = setTimeout(function() {
+            performFilterSearch($input.val().toLowerCase());
+        }, 150); // Debounce 150ms
     });
     
     // Genre filter
@@ -29,13 +31,10 @@ jQuery(document).ready(function($) {
         e.preventDefault();
         $('#genreFilters .filter-btn').removeClass('active');
         $(this).addClass('active');
-        
-        // Add filter functionality here if needed
-        // For now, just highlight the active filter
     });
     
     // Bookmark functionality with localStorage
-    $('.btn-bookmark').on('click', function(e) {
+    $(document).on('click', '.btn-bookmark', function(e) {
         e.preventDefault();
         const $btn = $(this);
         const movieTitle = $btn.closest('.movie-card').find('.movie-title').text();
@@ -54,6 +53,60 @@ jQuery(document).ready(function($) {
     // Load saved bookmarks
     loadBookmarks();
 });
+
+// OPTIMIZED: Lazy load images only when visible
+function initLazyLoadImages() {
+    if ('IntersectionObserver' in window) {
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                        img.removeAttribute('data-src');
+                        perfMetrics.imageLoadCount++;
+                    }
+                    observer.unobserve(img);
+                }
+            });
+        }, {
+            rootMargin: '100px'
+        });
+
+        jQuery('img[data-src]').each(function() {
+            imageObserver.observe(this);
+        });
+    } else {
+        // Fallback for older browsers
+        jQuery('img[data-src]').each(function() {
+            jQuery(this).attr('src', jQuery(this).attr('data-src')).removeAttr('data-src');
+        });
+    }
+}
+
+// OPTIMIZED: Debounced search
+function performFilterSearch(searchTerm) {
+    const $cards = jQuery('.movie-card');
+    let visibleCount = 0;
+    
+    $cards.each(function() {
+        const title = jQuery(this).find('.movie-title').text().toLowerCase();
+        const excerpt = jQuery(this).find('.movie-excerpt').text().toLowerCase();
+        const genres = jQuery(this).find('.genre-tag').text().toLowerCase();
+        
+        const matches = title.includes(searchTerm) || 
+                       excerpt.includes(searchTerm) || 
+                       genres.includes(searchTerm) ||
+                       searchTerm === '';
+        
+        if (matches) {
+            jQuery(this).fadeIn(200);
+            visibleCount++;
+        } else {
+            jQuery(this).fadeOut(200);
+        }
+    });
+}
 
 /**
  * Watchlist Management
@@ -82,54 +135,65 @@ function loadBookmarks() {
         }
     });
 }
-    // ====== CONFIG ====== 
-    const config = {
-        currentPage: 1,
-        isLoading: false,
-        hasMore: true,
-        hoverDelay: 1500,
-        currentFilter: 'all'
-    };
 
-    // ====== 1. VIDEO TRAILER ON HOVER ======
-    initTrailerOnHover();
-    
-    function initTrailerOnHover() {
-        $(document).on('mouseenter', '.movie-card', function() {
-            const card = $(this);
-            const trailerVideo = card.find('.movie-trailer');
-            const posterImg = card.find('.movie-poster');
-            
-            if (trailerVideo.length === 0) return;
-            
-            // Delay hover effect by 1.5 seconds
-            card.data('hoverTimer', setTimeout(function() {
-                posterImg.fadeOut(300, function() {
-                    trailerVideo.show();
-                    trailerVideo[0].play().catch(err => {
-                        console.log('Could not play trailer:', err);
-                        posterImg.show();
-                    });
-                });
-            }, config.hoverDelay));
-        });
+// ====== CONFIG ====== 
+const config = {
+    currentPage: 1,
+    isLoading: false,
+    hasMore: true,
+    hoverDelay: 800,  // Reduced from 1500ms for faster UX
+    currentFilter: 'all'
+};
+
+// ====== 1. VIDEO TRAILER ON HOVER (OPTIMIZED) ======
+initTrailerOnHover();
+
+function initTrailerOnHover() {
+    jQuery(document).on('mouseenter', '.movie-card', function() {
+        const card = jQuery(this);
+        const trailerVideo = card.find('.movie-trailer')[0];
+        const posterImg = card.find('.movie-poster');
         
-        $(document).on('mouseleave', '.movie-card', function() {
-            const card = $(this);
-            clearTimeout(card.data('hoverTimer'));
-            
-            const trailerVideo = card.find('.movie-trailer')[0];
-            const posterImg = card.find('.movie-poster');
-            
-            if (trailerVideo) {
-                trailerVideo.pause();
-                trailerVideo.currentTime = 0;
-                $(trailerVideo).fadeOut(300, function() {
-                    posterImg.show();
-                });
+        if (!trailerVideo) return;
+        
+        // Set up lazy video loading
+        if (!trailerVideo.src) {
+            const source = trailerVideo.querySelector('source');
+            if (source) {
+                trailerVideo.src = source.src;
             }
-        });
-    }
+        }
+        
+        // Delay hover effect
+        card.data('hoverTimer', setTimeout(function() {
+            // Check if card is still being hovered
+            if (!card.is(':hover')) return;
+            
+            posterImg.fadeOut(200, function() {
+                trailerVideo.style.display = 'block';
+                trailerVideo.play().catch(err => {
+                    console.log('Trailer autoplay prevented:', err);
+                    posterImg.fadeIn(200);
+                });
+            });
+        }, config.hoverDelay));
+    });
+    
+    jQuery(document).on('mouseleave', '.movie-card', function() {
+        const card = jQuery(this);
+        clearTimeout(card.data('hoverTimer'));
+        
+        const trailerVideo = card.find('.movie-trailer')[0];
+        const posterImg = card.find('.movie-poster');
+        
+        if (trailerVideo && trailerVideo.style.display !== 'none') {
+            trailerVideo.pause();
+            trailerVideo.currentTime = 0;
+            trailerVideo.style.display = 'none';
+            posterImg.fadeIn(200);
+        }
+    });
+}
     
     // ====== 2. LIVE SEARCH WITH THUMBNAILS ======
     initLiveSearch();
@@ -210,33 +274,39 @@ function loadBookmarks() {
             loadMoreMovies();
         });
         
-        // Optional: Auto-load more on scroll near bottom
-        $(window).on('scroll', function() {
-            if (shouldAutoLoad()) {
-                loadMoreMovies();
-            }
+        // OPTIMIZED: Throttled scroll event with RAF
+        let scrollTimeout;
+        jQuery(window).on('scroll', function() {
+            if (scrollTimeout) return;
+            
+            scrollTimeout = requestAnimationFrame(function() {
+                if (shouldAutoLoad()) {
+                    loadMoreMovies();
+                }
+                scrollTimeout = null;
+            });
         });
     }
     
     function shouldAutoLoad() {
         if (config.isLoading || !config.hasMore) return false;
         
-        const scrollPercent = $(window).scrollTop() / ($(document).height() - $(window).height());
-        return scrollPercent > 0.8; // Load when 80% scrolled
+        const scrollPercent = jQuery(window).scrollTop() / (jQuery(document).height() - jQuery(window).height());
+        return scrollPercent > 0.75; // Load when 75% scrolled
     }
     
     function loadMoreMovies() {
         if (config.isLoading || !config.hasMore) return;
         
         config.isLoading = true;
-        const loadMoreBtn = $('#loadMoreBtn');
-        const currentPage = parseInt($('#currentPage').val());
+        const loadMoreBtn = jQuery('#loadMoreBtn');
+        const currentPage = parseInt(jQuery('#currentPage').val());
         const nextPage = currentPage + 1;
-        const maxPages = parseInt($('#maxPages').val());
+        const maxPages = parseInt(jQuery('#maxPages').val());
         
         loadMoreBtn.addClass('loading').prop('disabled', true);
         
-        $.ajax({
+        jQuery.ajax({
             url: dsMoviesData.ajaxUrl + 'load-more',
             method: 'GET',
             data: {
@@ -246,14 +316,15 @@ function loadBookmarks() {
             success: function(response) {
                 if (response.success && response.movies.length > 0) {
                     let html = '';
-                    $.each(response.movies, function(i, movie) {
+                    jQuery.each(response.movies, function(i, movie) {
                         html += generateMovieCardHTML(movie);
                     });
                     
-                    $('#moviesGrid').append(html);
-                    $('#currentPage').val(nextPage);
+                    jQuery('#moviesGrid').append(html);
+                    jQuery('#currentPage').val(nextPage);
                     
-                    // Re-initialize hover effects for new cards
+                    // OPTIMIZED: Initialize lazy loading and hover for new cards
+                    initLazyLoadImages();
                     initTrailerOnHover();
                     
                     // Check if we've reached max pages
@@ -279,8 +350,8 @@ function loadBookmarks() {
                     ${movie.badge ? `<div class="movie-badge">${movie.badge}</div>` : ''}
                     
                     <div class="movie-media">
-                        ${movie.thumbnail ? `<img src="${movie.thumbnail}" alt="${movie.title}" class="movie-poster">` : '<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>'}
-                        ${movie.trailer_video ? `<video class="movie-trailer" style="display:none;"><source src="${movie.trailer_video}" type="video/mp4"></video>` : ''}
+                        ${movie.thumbnail ? `<img data-src="${movie.thumbnail}" alt="${movie.title}" class="movie-poster" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect fill='%23ddd' width='100' height='150'/%3E%3C/svg%3E">` : '<div style="width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>'}
+                        ${movie.trailer_video ? `<video class="movie-trailer" muted preload="none"><source src="${movie.trailer_video}" type="video/mp4"></video>` : ''}
                     </div>
                     
                     <div class="movie-info">

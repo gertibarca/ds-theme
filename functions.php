@@ -492,6 +492,7 @@ function ds_create_sample_movies() {
             'rating' => 8.8,
             'badge' => 'Masterpiece',
             'image_url' => 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/BigBuckBunny.mp4',
         ),
         array(
             'title' => 'The Shawshank Redemption',
@@ -500,6 +501,7 @@ function ds_create_sample_movies() {
             'rating' => 9.3,
             'badge' => 'Classic',
             'image_url' => 'https://images.unsplash.com/photo-1533613220915-121e16073d3b?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ElephantsDream.mp4',
         ),
         array(
             'title' => 'The Dark Knight',
@@ -508,6 +510,7 @@ function ds_create_sample_movies() {
             'rating' => 9.0,
             'badge' => 'Trending',
             'image_url' => 'https://images.unsplash.com/photo-1516876437184-593fda40c7ce?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerBlazes.mp4',
         ),
         array(
             'title' => 'Pulp Fiction',
@@ -516,6 +519,7 @@ function ds_create_sample_movies() {
             'rating' => 8.9,
             'badge' => 'Cult Classic',
             'image_url' => 'https://images.unsplash.com/photo-1547873799-f1d6808e8a11?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerEscapes.mp4',
         ),
         array(
             'title' => 'Interstellar',
@@ -524,6 +528,7 @@ function ds_create_sample_movies() {
             'rating' => 8.6,
             'badge' => 'Epic',
             'image_url' => 'https://images.unsplash.com/photo-1516846573888-558881c922e0?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerFun.mp4',
         ),
         array(
             'title' => 'The Matrix',
@@ -532,6 +537,7 @@ function ds_create_sample_movies() {
             'rating' => 8.7,
             'badge' => 'Iconic',
             'image_url' => 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerJoyrides.mp4',
         ),
         array(
             'title' => 'Forrest Gump',
@@ -540,6 +546,7 @@ function ds_create_sample_movies() {
             'rating' => 8.8,
             'badge' => 'Feel-Good',
             'image_url' => 'https://images.unsplash.com/photo-1483706543466-f82db2ac9d4b?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/Sintel.mp4',
         ),
         array(
             'title' => 'Gladiator',
@@ -548,6 +555,7 @@ function ds_create_sample_movies() {
             'rating' => 8.5,
             'badge' => 'Award Winner',
             'image_url' => 'https://images.unsplash.com/photo-1534695905606-82fa17e5aaae?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/TearsOfSteel.mp4',
         ),
         array(
             'title' => 'The Prestige',
@@ -556,6 +564,7 @@ function ds_create_sample_movies() {
             'rating' => 8.5,
             'badge' => 'Clever Plot',
             'image_url' => 'https://images.unsplash.com/photo-1516846573888-558881c922e0?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/BigBuckBunny.mp4',
         ),
         array(
             'title' => 'Parasite',
@@ -564,6 +573,7 @@ function ds_create_sample_movies() {
             'rating' => 8.6,
             'badge' => 'Palme d\'Or',
             'image_url' => 'https://images.unsplash.com/photo-1513741550867-28d24a3bb6cb?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ElephantsDream.mp4',
         ),
         array(
             'title' => 'Dune',
@@ -572,6 +582,7 @@ function ds_create_sample_movies() {
             'rating' => 8.0,
             'badge' => '4K Ultra HD',
             'image_url' => 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerBlazes.mp4',
         ),
         array(
             'title' => 'Oppenheimer',
@@ -580,6 +591,7 @@ function ds_create_sample_movies() {
             'rating' => 8.4,
             'badge' => '2024 Best',
             'image_url' => 'https://images.unsplash.com/photo-1569191318165-e33ffc3b4caf?w=400&h=600&fit=crop',
+            'trailer_url' => 'https://commondatastorage.googleapis.com/gtv-videos-library/sample/ForBiggerEscapes.mp4',
         ),
     );
     
@@ -610,6 +622,11 @@ function ds_create_sample_movies() {
             // Set custom fields
             update_post_meta($post_id, '_movie_imdb_rating', $movie['rating']);
             update_post_meta($post_id, '_movie_badge', $movie['badge']);
+            
+            // Add trailer video if available
+            if (!empty($movie['trailer_url'])) {
+                update_post_meta($post_id, '_movie_trailer_video', $movie['trailer_url']);
+            }
             
             // Set genres
             if (!empty($movie['genres'])) {
@@ -682,14 +699,6 @@ add_action('admin_init', function() {
         wp_redirect(admin_url('edit.php?post_type=movies'));
         exit;
     }
-});
-
-?>
-    register_rest_route('ds-theme/v1', '/search', array(
-        'methods'             => 'GET',
-        'callback'            => 'ds_api_live_search',
-        'permission_callback' => '__return_true',
-    ));
 });
 
 // 13. Register custom fields in REST API

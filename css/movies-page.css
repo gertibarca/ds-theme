@@ -157,22 +157,25 @@ body {
     margin-bottom: 3rem;
 }
 
-/* ====== MOVIE CARD ====== */
+/* ====== MOVIE CARD (OPTIMIZED FOR PERFORMANCE) ====== */
 .movie-card {
     background: white;
     border-radius: var(--border-radius);
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     cursor: pointer;
     display: flex;
     flex-direction: column;
     height: 100%;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .movie-card:hover {
-    transform: translateY(-8px);
+    transform: translateY(-8px) translateZ(0);
     box-shadow: 0 12px 28px rgba(229, 9, 20, 0.2);
+    transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .movie-poster-wrapper {
@@ -187,12 +190,24 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
     display: block;
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 .movie-card:hover .movie-poster {
-    transform: scale(1.08);
+    transform: scale(1.08) translateZ(0);
+    transition: transform 0.35s ease;
+}
+
+.movie-trailer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
 }
 
 .movie-badge {
